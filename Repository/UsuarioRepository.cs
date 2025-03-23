@@ -1,44 +1,51 @@
-﻿using eCommerce.API.Models;
+﻿using Microsoft.Data.SqlClient;
+using eCommerce.API.Models;
 using eCommerce.API.Repository.Interfaces;
+using System.Data;
+using Dapper;
 
 namespace eCommerce.API.Repository
 {
     public class UsuarioRepository : IUsuarioRepository
     {
-        private static List<Usuario> _usuariosDb =
-        [
-            new() { Id = 1, Nome = "John Doe", Email = "john.doe@example.com" },
-            new() { Id = 2, Nome = "Jane Smith", Email = "jane.smith@example.com" },
-            new() { Id = 3, Nome = "Alice Johnson", Email = "alice.johnson@example.com" },
-            new() { Id = 4, Nome = "Bob Brown", Email = "bob.brown@example.com" },
-            new() { Id = 5, Nome = "Charlie Davis", Email = "charlie.davis@example.com" }
-        ];
+        private IDbConnection _connection;
+
+        public UsuarioRepository()
+        {
+            string? connectionString = Environment.GetEnvironmentVariable("eCommerceConnectionString");
+            if (string.IsNullOrEmpty(connectionString))
+                throw new Exception("Environment connection string not provide");
+
+            _connection = new SqlConnection(connectionString);
+        }
 
         public List<Usuario> Get()
         {
-            return _usuariosDb;
+            return _connection.Query<Usuario>("SELECT * FROM Usuarios").ToList();
         }
 
         public Usuario? GetById(int id)
         {
-            return _usuariosDb.FirstOrDefault(usuario => usuario.Id == id);
+            return _connection.QuerySingleOrDefault<Usuario>("SELECT * FROM Usuarios WHERE Id = @Id", new { Id = id });
         }
 
         public void Insert(Usuario usuario)
         {
-            usuario.Id = _usuariosDb.LastOrDefault()?.Id + 1 ?? 1;
+            string sqlCommand = "INSERT INTO Usuarios(Nome, Email, Sexo, RG, CPF, NomeMae, SituacaoCadastro, DataCadastro) VALUES (@Nome, @Email, @Sexo, @RG, @CPF, @NomeMae, @SituacaoCadastro, @DataCadastro); SELECT CAST(SCOPE_IDENTITY() AS INT)";
 
-            _usuariosDb.Add(usuario);
+            usuario.Id = _connection.Query<int>(sqlCommand, usuario).Single();
         }
 
         public void Update(Usuario usuario)
         {
-            _usuariosDb[_usuariosDb.FindIndex(u => u.Id == usuario.Id)] = usuario;
+            string sqlCommand = "UPDATE Usuarios SET Nome = @Nome, Email = @Email, Sexo = @Sexo, RG = @RG, CPF = @CPF, NomeMae = @NomeMae, SituacaoCadastro = @SituacaoCadastro, DataCadastro = @DataCadastro WHERE Id = @Id";
+
+            _connection.Execute(sqlCommand, usuario);
         }
 
         public void Delete(int id)
         {
-            _usuariosDb.Remove(_usuariosDb.FirstOrDefault(usuario => usuario.Id == id));
+            _connection.Execute("DELETE FROM Usuarios WHERE Id = @Id", new { Id = id });
         }
     }
 }

@@ -30,12 +30,15 @@ namespace eCommerce.API.Controllers
         public IActionResult Insert([FromBody] Usuario usuario)
         {
             _usuarioRepository.Insert(usuario);
-            return StatusCode(StatusCodes.Status201Created);
+            return StatusCode(StatusCodes.Status201Created, usuario);
         }
 
         [HttpPut]
         public IActionResult Update([FromBody] Usuario usuario)
         {
+            if (_usuarioRepository.GetById(usuario.Id) is null)
+                return NotFound();
+
             _usuarioRepository.Update(usuario);
             return Ok(usuario);
         }
