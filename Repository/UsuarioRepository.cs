@@ -26,21 +26,73 @@ namespace eCommerce.API.Repository
 
         public Usuario? GetById(int id)
         {
-            return _connection.QuerySingleOrDefault<Usuario>("SELECT * FROM Usuarios WHERE Id = @Id", new { Id = id });
+            return _connection.Query<Usuario, Contato, Usuario>(
+                "SELECT * FROM Usuarios as US LEFT JOIN Contatos CT ON US.id = CT.UsuarioId WHERE US.id = @Id",
+                (usuario, contato) =>
+                {
+                    usuario.Contato = contato;
+                    return usuario;
+                },
+                new { Id = id }
+            ).SingleOrDefault();
         }
 
         public void Insert(Usuario usuario)
         {
-            string sqlCommand = "INSERT INTO Usuarios(Nome, Email, Sexo, RG, CPF, NomeMae, SituacaoCadastro, DataCadastro) VALUES (@Nome, @Email, @Sexo, @RG, @CPF, @NomeMae, @SituacaoCadastro, @DataCadastro); SELECT CAST(SCOPE_IDENTITY() AS INT)";
+            _connection.Open();
 
-            usuario.Id = _connection.Query<int>(sqlCommand, usuario).Single();
+            var transaction = _connection.BeginTransaction();
+            try
+            {
+                string sqlCommand = "INSERT INTO Usuarios(Nome, Email, Sexo, RG, CPF, NomeMae, SituacaoCadastro, DataCadastro) VALUES (@Nome, @Email, @Sexo, @RG, @CPF, @NomeMae, @SituacaoCadastro, @DataCadastro); SELECT CAST(SCOPE_IDENTITY() AS INT)";
+                usuario.Id = _connection.Query<int>(sqlCommand, usuario, transaction).Single();
+
+                if (usuario.Contato != null)
+                {
+                    usuario.Contato.UsuarioId = usuario.Id;
+                    sqlCommand = "INSERT INTO Contatos (UsuarioId, Telefone, Celular) VALUES (@UsuarioId, @Telefone, @Celular); SELECT CAST(SCOPE_IDENTITY() AS INT)";
+                    usuario.Contato.Id = _connection.Query<int>(sqlCommand, usuario.Contato, transaction).Single();
+                }
+
+                transaction.Commit();
+            }
+            catch (Exception)
+            {
+                transaction.Rollback();
+                throw;
+            }
+            finally
+            {
+                _connection.Close();
+            }
         }
 
         public void Update(Usuario usuario)
         {
-            string sqlCommand = "UPDATE Usuarios SET Nome = @Nome, Email = @Email, Sexo = @Sexo, RG = @RG, CPF = @CPF, NomeMae = @NomeMae, SituacaoCadastro = @SituacaoCadastro, DataCadastro = @DataCadastro WHERE Id = @Id";
+            _connection.Open();
 
-            _connection.Execute(sqlCommand, usuario);
+            var transaction = _connection.BeginTransaction();
+            try
+            {
+                string sqlCommand = "UPDATE Usuarios SET Nome = @Nome, Email = @Email, Sexo = @Sexo, RG = @RG, CPF = @CPF, NomeMae = @NomeMae, SituacaoCadastro = @SituacaoCadastro, DataCadastro = @DataCadastro WHERE Id = @Id";
+                _connection.Execute(sqlCommand, usuario, transaction);
+
+                if (usuario.Contato != null)
+                {
+                    sqlCommand = "UPDATE Contatos SET Telefone = @Telefone, Celular = @Celular WHERE Id = @Id";
+                    _connection.Execute(sqlCommand, usuario.Contato, transaction);
+                }
+                transaction.Commit();
+            }
+            catch (Exception)
+            {
+                transaction.Rollback();
+                throw;
+            }
+            finally
+            {
+                _connection.Close();
+            }
         }
 
         public void Delete(int id)
