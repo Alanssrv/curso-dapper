@@ -21,20 +21,52 @@ namespace eCommerce.API.Repository
 
         public List<Usuario> Get()
         {
-            return _connection.Query<Usuario>("SELECT * FROM Usuarios").ToList();
+            string sqlCommand = "SELECT * FROM Usuarios as US LEFT JOIN Contatos CT ON US.id = CT.UsuarioId LEFT JOIN EnderecosEntrega EE ON US.id = EE.UsuarioId";
+
+            List<Usuario> usuarios = [];
+
+            _ = _connection.Query<Usuario, Contato, EnderecoEntrega, Usuario>(sqlCommand,
+                (usuario, contato, enderecoEntrega) =>
+                {
+                    if (usuarios.SingleOrDefault(usr => usr.Id == usuario.Id) is null)
+                    {
+                        usuario.EnderecosEntrega = [];
+                        usuario.Contato = contato;
+                        usuarios.Add(usuario);
+                    }
+                    else
+                    {
+                        usuario = usuarios.SingleOrDefault(usr => usr.Id == usuario.Id);
+                    }
+
+                    usuario!.EnderecosEntrega!.Add(enderecoEntrega);
+                    return usuario;
+                }
+            ).ToList();
+
+            return usuarios;
         }
 
         public Usuario? GetById(int id)
         {
-            return _connection.Query<Usuario, Contato, Usuario>(
-                "SELECT * FROM Usuarios as US LEFT JOIN Contatos CT ON US.id = CT.UsuarioId WHERE US.id = @Id",
-                (usuario, contato) =>
+            string sqlCommand = "SELECT * FROM Usuarios as US LEFT JOIN Contatos CT ON US.id = CT.UsuarioId LEFT JOIN EnderecosEntrega EE ON US.id = EE.UsuarioId WHERE US.id = @Id";
+
+            Usuario? refUsuario = null;
+
+            _ = _connection.Query<Usuario, Contato, EnderecoEntrega , Usuario>(
+                sqlCommand,
+                (usuario, contato, enderecoEntrega) =>
                 {
-                    usuario.Contato = contato;
+                    refUsuario ??= usuario;
+                    refUsuario.Contato ??= contato;
+                    refUsuario.EnderecosEntrega ??= [];
+                    refUsuario.EnderecosEntrega.Add(enderecoEntrega);
                     return usuario;
                 },
                 new { Id = id }
-            ).SingleOrDefault();
+            );
+
+            return refUsuario;
         }
 
         public void Insert(Usuario usuario)
