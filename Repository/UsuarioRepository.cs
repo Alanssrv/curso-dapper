@@ -86,6 +86,16 @@ namespace eCommerce.API.Repository
                     usuario.Contato.Id = _connection.Query<int>(sqlCommand, usuario.Contato, transaction).Single();
                 }
 
+                if (usuario.EnderecosEntrega != null)
+                {
+                    foreach (var enderecoEntrega in usuario.EnderecosEntrega)
+                    {
+                        enderecoEntrega.UsuarioId = usuario.Id;
+                        sqlCommand = "INSERT INTO EnderecosEntrega (UsuarioId, NomeEndereco, CEP, Estado, Cidade, Bairro, Endereco, Numero, Complemento) VALUES (@UsuarioId, @NomeEndereco, @CEP, @Estado, @Cidade, @Bairro, @Endereco, @Numero, @Complemento); SELECT CAST(SCOPE_IDENTITY() AS INT)";
+                        enderecoEntrega.Id = _connection.Query<int>(sqlCommand, enderecoEntrega, transaction).Single();
+                    }
+                }
+
                 transaction.Commit();
             }
             catch (Exception)
@@ -114,6 +124,20 @@ namespace eCommerce.API.Repository
                     sqlCommand = "UPDATE Contatos SET Telefone = @Telefone, Celular = @Celular WHERE Id = @Id";
                     _connection.Execute(sqlCommand, usuario.Contato, transaction);
                 }
+
+                sqlCommand = "DELETE FROM EnderecosEntrega WHERE UsuarioId = @Id";
+                _connection.Execute(sqlCommand, usuario, transaction);
+
+                if (usuario.EnderecosEntrega != null)
+                {
+                    foreach (var enderecoEntrega in usuario.EnderecosEntrega)
+                    {
+                        enderecoEntrega.UsuarioId = usuario.Id;
+                        sqlCommand = "INSERT INTO EnderecosEntrega (UsuarioId, NomeEndereco, CEP, Estado, Cidade, Bairro, Endereco, Numero, Complemento) VALUES (@UsuarioId, @NomeEndereco, @CEP, @Estado, @Cidade, @Bairro, @Endereco, @Numero, @Complemento); SELECT CAST(SCOPE_IDENTITY() AS INT)";
+                        enderecoEntrega.Id = _connection.Query<int>(sqlCommand, enderecoEntrega, transaction).Single();
+                    }
+                }
+
                 transaction.Commit();
             }
             catch (Exception)

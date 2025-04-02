@@ -4,7 +4,7 @@ namespace eCommerce.API.Models
 {
     public class EnderecoEntrega : BaseModel
     {
-        public int UsuarioId { get; set; }
+        public int? UsuarioId { get; set; }
 
         public string NomeEndereco { get; set; }
 
@@ -22,6 +22,6 @@ namespace eCommerce.API.Models
 
         public string Complemento { get; set; }
 
-        public Usuario Usuario { get; set; }
+        public Usuario? Usuario { get; set; }
     }
 }
