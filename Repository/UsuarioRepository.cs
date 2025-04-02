@@ -21,15 +21,16 @@ namespace eCommerce.API.Repository
 
         public List<Usuario> Get()
         {
-            string sqlCommand = "SELECT * FROM Usuarios as US LEFT JOIN Contatos CT ON US.id = CT.UsuarioId LEFT JOIN EnderecosEntrega EE ON US.id = EE.UsuarioId";
+            string sqlCommand = "SELECT US.*, CT.*, EE.*, DP.* FROM Usuarios as US LEFT JOIN Contatos CT ON US.id = CT.UsuarioId LEFT JOIN EnderecosEntrega EE ON US.id = EE.UsuarioId LEFT JOIN UsuariosDepartamentos UD ON UD.UsuarioId = US.Id LEFT JOIN Departamentos DP on UD.DepartamentoId = DP.Id";
 
             List<Usuario> usuarios = [];
 
-            _ = _connection.Query<Usuario, Contato, EnderecoEntrega, Usuario>(sqlCommand,
-                (usuario, contato, enderecoEntrega) =>
+            _ = _connection.Query<Usuario, Contato, EnderecoEntrega, Departamento, Usuario>(sqlCommand,
+                (usuario, contato, enderecoEntrega, departamento) =>
                 {
                     if (usuarios.SingleOrDefault(usr => usr.Id == usuario.Id) is null)
                     {
+                        usuario.Departamentos = [];
                         usuario.EnderecosEntrega = [];
                         usuario.Contato = contato;
                         usuarios.Add(usuario);
@@ -39,7 +40,12 @@ namespace eCommerce.API.Repository
                         usuario = usuarios.SingleOrDefault(usr => usr.Id == usuario.Id);
                     }
 
-                    usuario!.EnderecosEntrega!.Add(enderecoEntrega);
+                    if (usuario!.EnderecosEntrega!.SingleOrDefault(endEntrega => endEntrega.Id == enderecoEntrega.Id) is null && enderecoEntrega is not null)
+                        usuario!.EnderecosEntrega!.Add(enderecoEntrega);
+
+                    if (usuario!.Departamentos!.SingleOrDefault(depart => depart.Id == departamento.Id) is null && departamento is not null)
+                        usuario!.Departamentos!.Add(departamento);
+
                     return usuario;
                 }
             ).ToList();
@@ -49,18 +55,24 @@ namespace eCommerce.API.Repository
 
         public Usuario? GetById(int id)
         {
-            string sqlCommand = "SELECT * FROM Usuarios as US LEFT JOIN Contatos CT ON US.id = CT.UsuarioId LEFT JOIN EnderecosEntrega EE ON US.id = EE.UsuarioId WHERE US.id = @Id";
+            string sqlCommand = "SELECT US.*, CT.*, EE.*, DP.* FROM Usuarios as US LEFT JOIN Contatos CT ON US.id = CT.UsuarioId LEFT JOIN EnderecosEntrega EE ON US.id = EE.UsuarioId LEFT JOIN UsuariosDepartamentos UD ON UD.UsuarioId = US.Id LEFT JOIN Departamentos DP on UD.DepartamentoId = DP.Id WHERE US.Id = @Id";
 
             Usuario? refUsuario = null;
 
-            _ = _connection.Query<Usuario, Contato, EnderecoEntrega , Usuario>(
+            _ = _connection.Query<Usuario, Contato, EnderecoEntrega, Departamento, Usuario>(
                 sqlCommand,
-                (usuario, contato, enderecoEntrega) =>
+                (usuario, contato, enderecoEntrega, departamento) =>
                 {
                     refUsuario ??= usuario;
                     refUsuario.Contato ??= contato;
                     refUsuario.EnderecosEntrega ??= [];
-                    refUsuario.EnderecosEntrega.Add(enderecoEntrega);
+                    if (refUsuario.EnderecosEntrega.SingleOrDefault(end => end.Id == enderecoEntrega.Id) is null && enderecoEntrega is not null)
+                        refUsuario.EnderecosEntrega.Add(enderecoEntrega);
+
+                    refUsuario.Departamentos ??= [];
+                    if (refUsuario.Departamentos.SingleOrDefault(dep => dep.Id == departamento.Id) is null && departamento is not null)
+                        refUsuario.Departamentos.Add(departamento);
+
                     return usuario;
                 },
                 new { Id = id }
@@ -93,6 +105,15 @@ namespace eCommerce.API.Repository
                         enderecoEntrega.UsuarioId = usuario.Id;
                         sqlCommand = "INSERT INTO EnderecosEntrega (UsuarioId, NomeEndereco, CEP, Estado, Cidade, Bairro, Endereco, Numero, Complemento) VALUES (@UsuarioId, @NomeEndereco, @CEP, @Estado, @Cidade, @Bairro, @Endereco, @Numero, @Complemento); SELECT CAST(SCOPE_IDENTITY() AS INT)";
                         enderecoEntrega.Id = _connection.Query<int>(sqlCommand, enderecoEntrega, transaction).Single();
+                    }
+                }
+
+                if (usuario.Departamentos != null)
+                {
+                    foreach (var departamento in usuario.Departamentos)
+                    {
+                        sqlCommand = "INSERT INTO UsuariosDepartamentos (UsuarioId, DepartamentoId) VALUES (@UsuarioId, @DepartamentoId)";
+                        _connection.Execute(sqlCommand, new { UsuarioId = usuario.Id, DepartamentoId = departamento.Id }, transaction);
                     }
                 }
 
@@ -135,6 +156,17 @@ namespace eCommerce.API.Repository
                         enderecoEntrega.UsuarioId = usuario.Id;
                         sqlCommand = "INSERT INTO EnderecosEntrega (UsuarioId, NomeEndereco, CEP, Estado, Cidade, Bairro, Endereco, Numero, Complemento) VALUES (@UsuarioId, @NomeEndereco, @CEP, @Estado, @Cidade, @Bairro, @Endereco, @Numero, @Complemento); SELECT CAST(SCOPE_IDENTITY() AS INT)";
                         enderecoEntrega.Id = _connection.Query<int>(sqlCommand, enderecoEntrega, transaction).Single();
+                    }
+                }
+
+                sqlCommand = "DELETE FROM UsuariosDepartamentos WHERE UsuarioId = @Id";
+                _connection.Execute(sqlCommand, usuario, transaction);
+                if (usuario.Departamentos != null)
+                {
+                    foreach (var departamento in usuario.Departamentos)
+                    {
+                        sqlCommand = "INSERT INTO UsuariosDepartamentos (UsuarioId, DepartamentoId) VALUES (@UsuarioId, @DepartamentoId)";
+                        _connection.Execute(sqlCommand, new { UsuarioId = usuario.Id, DepartamentoId = departamento.Id }, transaction);
                     }
                 }
 
