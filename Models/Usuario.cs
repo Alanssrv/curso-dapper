@@ -1,4 +1,5 @@
-﻿using eCommerce.API.Models.Base;
+﻿using Dapper.Contrib.Extensions;
+using eCommerce.API.Models.Base;
 
 namespace eCommerce.API.Models
 {
@@ -20,8 +21,11 @@ namespace eCommerce.API.Models
 
         public DateTimeOffset DataCadastro { get; set; }
 
+        [Write(false)]
         public Contato? Contato { get; set; }
+        [Write(false)]
         public ICollection<EnderecoEntrega>? EnderecosEntrega { get; set; }
+        [Write(false)]
         public ICollection<Departamento>? Departamentos { get; set; }
     }
 }
